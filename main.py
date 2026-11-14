@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from src.parser import parse_pcap
 from src.conversations import build_conversations
 from src.detections import run_all_detections
+from src.anomaly import detect_anomalies
 from src.report import build_report, write_json_report, write_text_report
 
 
@@ -53,8 +54,12 @@ def main():
         print(f"       {c['packets']} packets, {c['bytes']} bytes "
               f"({c['bytes_a_to_b']} out / {c['bytes_b_to_a']} in)")
 
-    findings = run_all_detections(packets)
-    print(f"\nDetections: {len(findings)}")
+    rule_findings = run_all_detections(packets)
+    ml_findings, ml_note = detect_anomalies(packets, rule_findings)
+    findings = rule_findings + ml_findings
+
+    print(f"\n{ml_note}")
+    print(f"Detections: {len(findings)}")
     for f in findings:
         print(f"  [{f['severity']}] {f['type']}: {f['src']} -> {f['target']}")
         print(f"       {f['detail']}")

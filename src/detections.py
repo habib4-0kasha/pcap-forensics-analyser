@@ -9,6 +9,7 @@ MIN_LABEL_LENGTH = 12        # ignore short labels, entropy is meaningless on th
 LONG_QUERY_LENGTH = 60       # total characters in one DNS name
 BEACON_MIN_QUERIES = 5       # repeats needed before we look for a rhythm
 BEACON_MAX_JITTER = 0.1      # gaps within 10% of each other = clockwork
+MAX_VOWEL_RATIO = 0.25       # real words are vowel-rich, random strings are not
 SKIP_SUFFIXES = (".arpa", ".local")
 
 
@@ -21,6 +22,11 @@ def shannon_entropy(text):
         counts[ch] += 1
     total = len(text)
     return -sum((n / total) * math.log2(n / total) for n in counts.values())
+
+def looks_random(label):
+    """High entropy AND few vowels: random text, not a long real word like 'stackoverflow'."""
+    vowels = sum(ch in "aeiou" for ch in label) / len(label)
+    return shannon_entropy(label) >= ENTROPY_THRESHOLD and vowels < MAX_VOWEL_RATIO
 
 
 def detect_port_scans(packets, threshold=PORT_SCAN_THRESHOLD):
@@ -85,8 +91,8 @@ def detect_suspicious_domains(packets):
         reason = None
         if len(name) >= LONG_QUERY_LENGTH:
             reason = "Unusually long DNS query"
-        elif any(len(l) >= MIN_LABEL_LENGTH and shannon_entropy(l.lower()) >= ENTROPY_THRESHOLD
-                 for l in labels[:-1]):
+        elif any(len(l) >= MIN_LABEL_LENGTH and looks_random(l.lower())
+                for l in labels[:-1]):
             reason = "High-entropy domain"
         if reason:
             flagged[(p["src"], reason)].append(name)
